@@ -80,6 +80,10 @@ function encoderForArrayFormat(options) {
 	}
 }
 
+/**
+ * 根据配置获取数组类型的值的解析函数
+ * @param {*} options 
+ */
 function parserForArrayFormat(options) {
 	let result;
 
@@ -207,6 +211,7 @@ function extract(input) {
 	return input.slice(queryStart + 1);
 }
 
+// 处理数字和 boolean 值
 function parseValue(value, options) {
 	if (options.parseNumbers && !Number.isNaN(Number(value)) && (typeof value === 'string' && value.trim() !== '')) {
 		value = Number(value);
@@ -217,6 +222,11 @@ function parseValue(value, options) {
 	return value;
 }
 
+/**
+ * 将 key-value 字符串解析成对象
+ * @param {*} query 
+ * @param {*} options 
+ */
 function parse(query, options) {
 	options = Object.assign({
 		decode: true,
@@ -227,6 +237,7 @@ function parse(query, options) {
 		parseBooleans: false
 	}, options);
 
+	// 校验数组分隔符
 	validateArrayFormatSeparator(options.arrayFormatSeparator);
 
 	const formatter = parserForArrayFormat(options);
@@ -234,29 +245,38 @@ function parse(query, options) {
 	// Create an object with no prototype
 	const ret = Object.create(null);
 
+	// 如果 query 不是字符串，不进行解析，返回空对象
 	if (typeof query !== 'string') {
 		return ret;
 	}
 
+	// 如果第一个字符是 ?#& 之一，去掉
 	query = query.trim().replace(/^[?#&]/, '');
 
 	if (!query) {
 		return ret;
 	}
 
+	// 得到 key value 字符串并遍历处理
 	for (const param of query.split('&')) {
 		if (param === '') {
 			continue;
 		}
 
+		// 如果设置 decode=true，则将 + 替换成空格（url 一般会把空格转换成 +）
 		let [key, value] = splitOnFirst(options.decode ? param.replace(/\+/g, ' ') : param, '=');
 
 		// Missing `=` should be `null`:
 		// http://w3.org/TR/2012/WD-url-20120524/#collect-url-parameters
+		// 空值则赋值为 null（如 a&b=1 中的 a）
+		// options.arrayFormat 代表数组的数据格式，'comma', 'separator' 代表用分隔符解析，如：a=1,2,3&b=x,y
 		value = value === undefined ? null : ['comma', 'separator'].includes(options.arrayFormat) ? value : decode(value, options);
+		
+		// 处理数组类型的值
 		formatter(decode(key, options), value, ret);
 	}
 
+	// 解析值，默认都是字符串
 	for (const key of Object.keys(ret)) {
 		const value = ret[key];
 		if (typeof value === 'object' && value !== null) {
@@ -272,8 +292,11 @@ function parse(query, options) {
 		return ret;
 	}
 
+	// key 排序
 	return (options.sort === true ? Object.keys(ret).sort() : Object.keys(ret).sort(options.sort)).reduce((result, key) => {
 		const value = ret[key];
+		
+		// 如果 value 对象，也会进行排序
 		if (Boolean(value) && typeof value === 'object' && !Array.isArray(value)) {
 			// Sort object keys, not values
 			result[key] = keysSorter(value);
